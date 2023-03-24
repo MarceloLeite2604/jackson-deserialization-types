@@ -1,5 +1,7 @@
 package com.github.marceloleite2604.chat.domain.message;
 
+import com.github.marceloleite2604.chat.validation.group.Post;
+import com.github.marceloleite2604.chat.validation.group.Put;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -17,9 +19,9 @@ public class MessageDto {
 
     private Long time;
 
-    @NotBlank
+    @NotBlank(groups = Put.class)
     private String user;
 
-    @NotBlank
+    @NotBlank(groups = {Put.class, Post.class})
     private String content;
 }

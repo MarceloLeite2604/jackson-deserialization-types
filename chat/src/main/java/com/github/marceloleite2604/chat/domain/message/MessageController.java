@@ -1,6 +1,8 @@
 package com.github.marceloleite2604.chat.domain.message;
 
 import com.github.marceloleite2604.chat.validation.ValidUuid;
+import com.github.marceloleite2604.chat.validation.group.Post;
+import com.github.marceloleite2604.chat.validation.group.Put;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,62 +22,91 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MessageController {
 
-    public static final String BASE_PATH = "messages";
+  public static final String BASE_PATH = "messages";
 
-    private final MessageService messageService;
+  private final MessageService messageService;
 
-    private final MessageToDtoMapper messageToDtoMapper;
+  private final MessageToDtoMapper messageToDtoMapper;
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> post(@RequestBody @Validated MessageDto messageDto) {
-        final var message = messageToDtoMapper.mapFrom(messageDto);
+  @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<Void> put(
+      @RequestBody
+      @Validated(Put.class)
+      MessageDto messageDto) {
+    final var message = messageToDtoMapper.mapFrom(messageDto);
 
-        final var persistedMessage = messageService.save(message);
+    final var persistedMessage = messageService.save(message);
 
-        final var location = createMessageLocationUri(persistedMessage.getId());
+    return createResponseEntityWithStatusCreatedAndLocationHeader(persistedMessage);
+  }
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.LOCATION, location)
-                .build();
+  @PostMapping(
+      path = "/{id}",
+      consumes = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<Void> post(
+      @PathVariable
+      @ValidUuid
+      String id,
 
+      @RequestBody
+      @Validated(Post.class)
+      MessageDto messageDto
+  ) {
+    final var uuid = UUID.fromString(id);
+
+    final var message = messageToDtoMapper.mapFrom(messageDto);
+
+    return messageService.update(uuid, message)
+        .map(updatedMessage -> ResponseEntity.ok()
+            .<Void>build())
+        .orElseGet(() -> ResponseEntity.notFound()
+            .build());
+  }
+
+  @GetMapping(path = "/{id}")
+  public ResponseEntity<MessageDto> get(@PathVariable @ValidUuid String id) {
+
+    final var uuid = UUID.fromString(id);
+
+    return messageService.findById(uuid)
+        .map(messageToDtoMapper::mapTo)
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.notFound()
+            .build());
+  }
+
+  @GetMapping
+  public ResponseEntity<List<MessageDto>> getAll() {
+
+    final var messages = messageService.findAll();
+
+    if (CollectionUtils.isEmpty(messages)) {
+      return ResponseEntity.status(HttpStatus.NO_CONTENT)
+          .build();
     }
 
-    @GetMapping(path = "/{id}")
-    public ResponseEntity<MessageDto> get(@PathVariable @ValidUuid String id) {
+    final var messagesDto = messageToDtoMapper.mapAllTo(messages)
+        .stream()
+        .sorted(Comparator.comparing(MessageDto::getTime))
+        .toList();
 
-        final var uuid = UUID.fromString(id);
+    return ResponseEntity.ok(messagesDto);
+  }
 
-        return messageService.findById(uuid)
-                .map(messageToDtoMapper::mapTo)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound()
-                        .build());
-    }
+  private ResponseEntity<Void> createResponseEntityWithStatusCreatedAndLocationHeader(Message message) {
+    final var location = createMessageLocationUri(message);
 
-    @GetMapping
-    public ResponseEntity<List<MessageDto>> getAll() {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .header(HttpHeaders.LOCATION, location)
+        .build();
+  }
 
-        final var messages = messageService.findAll();
-
-        if (CollectionUtils.isEmpty(messages)) {
-            return ResponseEntity.status(HttpStatus.NO_CONTENT)
-                    .build();
-        }
-
-        final var messagesDto = messageToDtoMapper.mapAllTo(messages)
-                .stream()
-                .sorted(Comparator.comparing(MessageDto::getTime))
-                .toList();
-
-        return ResponseEntity.ok(messagesDto);
-    }
-
-    private String createMessageLocationUri(UUID id) {
-        return ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .pathSegment("{id}")
-                .buildAndExpand(id)
-                .toUri()
-                .toASCIIString();
-    }
+  private String createMessageLocationUri(Message message) {
+    return ServletUriComponentsBuilder
+        .fromCurrentRequest()
+        .pathSegment("{id}")
+        .buildAndExpand(message.getId())
+        .toUri()
+        .toASCIIString();
+  }
 }

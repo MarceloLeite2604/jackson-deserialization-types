@@ -14,23 +14,36 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MessageService {
 
-    private final MessageRepository messageRepository;
+  private final MessageRepository messageRepository;
 
-    public Message save(Message message) {
+  public Message save(Message message) {
 
-        final var messageToBePersisted = message.toBuilder()
-                .id(UUID.randomUUID())
-                .time(LocalDateTime.now())
-                .build();
+    final var messageToBePersisted = message.toBuilder()
+        .id(UUID.randomUUID())
+        .time(LocalDateTime.now())
+        .build();
 
-        return messageRepository.save(messageToBePersisted);
-    }
+    return messageRepository.save(messageToBePersisted);
+  }
 
-    public Optional<Message> findById(UUID id) {
-        return messageRepository.findById(id);
-    }
+  public Optional<Message> findById(UUID id) {
+    return messageRepository.findById(id);
+  }
 
-    public Collection<Message> findAll() {
-        return messageRepository.findAll();
-    }
+  public Collection<Message> findAll() {
+    return messageRepository.findAll();
+  }
+
+  public Optional<Message> update(UUID id, Message updatedMessage) {
+    return messageRepository.findById(id)
+        .map(persistedMessage -> merge(persistedMessage, updatedMessage))
+        .map(messageRepository::save);
+  }
+
+  private Message merge(Message persistedMessage, Message updatedMessage) {
+    return persistedMessage.toBuilder()
+        .content(updatedMessage.getContent())
+        .time(LocalDateTime.now())
+        .build();
+  }
 }
